@@ -1,18 +1,18 @@
 {
-    "name": "goldoni/php7.2-query-builder",
-    "description": "This PHP library is responsible for building SQL query strings, Paginate and Hydration via an object oriented PHP interface.",
+    "name": "erodriguezds/active-orm",
+    "description": "Yet another lightweight ActiveRecord ORM for PHP library is responsible for building SQL query strings, Paginate and Hydration via an object oriented PHP interface.",
     "type": "library",
     "license": "MIT",
     "authors": [
         {
-            "name": "Goldoni Fouotsa",
-            "email": "fotsa.goldoni@yahoo.fr"
+            "name": "Eduardo Rodriguez Da Silva",
+            "email": "eduardo.rodriguez.dasilva@gmail.com"
         }
     ],
     "minimum-stability": "stable",
     "autoload": {
         "psr-4": {
-            "Goldoni\\Builder\\": "src/"
+            "ActiveORM\\": "src/"
         }
     },
     "autoload-dev": {

@@ -1,15 +1,7 @@
 <?php
 
-/**
- * Created by PhpStorm.
- * User: Goldoni
- * Date: 31/10/2018
- * Time: 00:53.
- */
+namespace ActiveORM;
 
-namespace Goldoni\Builder;
-
-use Pagerfanta\Pagerfanta;
 use PDO;
 
 /**
@@ -48,7 +40,7 @@ class Query implements \IteratorAggregate
     /**
      * @var array
      */
-    private $where = [];
+    private $where;// = [];
     /**
      * @var array
      */
@@ -56,7 +48,7 @@ class Query implements \IteratorAggregate
     /**
      * @var string
      */
-    private $entity;
+    protected $entity;
     /**
      * @var string
      */
@@ -73,12 +65,18 @@ class Query implements \IteratorAggregate
     /**
      * @var \PDO
      */
-    private $pdo;
+    protected $pdo;
+
+    /**
+     * Gloabal PDO that can be set statically, so all Queries use it
+     * @var \PDO
+     */
+    protected static $global_pdo;
 
     /**
      * @var array
      */
-    private $params = [];
+    protected $params = [];
 
     /**
      * Query constructor.
@@ -88,6 +86,20 @@ class Query implements \IteratorAggregate
     public function __construct(?PDO $pdo = null)
     {
         $this->pdo = $pdo;
+    }
+
+    public static function setPdo(PDO $pdo)
+    {
+        self::$global_pdo = $pdo;
+    }
+
+    private function getPdo()
+    {
+        return (
+            $this->pdo !== null ?
+            $this->pdo :
+            self::$global_pdo
+        );
     }
 
     /**
@@ -108,13 +120,22 @@ class Query implements \IteratorAggregate
     }
 
     /**
-     * @param string ...$fields
-     *
+     * @param mixed $fields
+     * @param bool $override Whether to override the existing select fields.
+     *  Defaults to false, which appends new select field to the previously selected 
      * @return \Goldoni\Builder\Query
      */
-    public function select(string ...$fields): self
+    public function select($fields, $override = false): self
     {
-        $this->select = $fields;
+        if(is_string($fields)){
+            $fields = explode(',', $fields);
+        }
+
+        if($override === true){
+            $this->select = $fields;
+        } else {
+            $this->select = array_merge($this->select, $fields);
+        }
 
         return $this;
     }
@@ -190,9 +211,15 @@ class Query implements \IteratorAggregate
      *
      * @return \Goldoni\Builder\Query
      */
-    public function where(string ...$conditions): self
+    public function where($conditions, $operator = 'AND'): self
     {
-        $this->where = array_merge($this->where, $conditions);
+        if($conditions !== null){
+            if($this->where == null){
+                $this->where = new ConditionBlock($conditions, $operator);
+            } else {
+                $this->where->append($conditions);
+            }
+        }
 
         return $this;
     }
@@ -204,7 +231,14 @@ class Query implements \IteratorAggregate
      *
      * @return \Goldoni\Builder\Query
      */
-    public function join(string $table, string $condition, string  $type = 'left'): self
+    public function join(string $table, string $condition, string  $type = 'inner'): self
+    {
+        $this->joins[$type][] = [$table, $condition];
+
+        return $this;
+    }
+
+    public function leftJoin(string $table, string $condition, string  $type = 'left'): self
     {
         $this->joins[$type][] = [$table, $condition];
 
@@ -274,21 +308,7 @@ class Query implements \IteratorAggregate
         return $this;
     }
 
-    public function fetchAll(): QueryResult
-    {
-        return new QueryResult($this->execute()->fetchAll(\PDO::FETCH_ASSOC), $this->entity);
-    }
-
-    public function paginate(int $perPage, int $currentPage = 1)
-    {
-        $paginator = new Paginator($this, $perPage, $currentPage);
-
-        return (new Pagerfanta($paginator))
-            ->setMaxPerPage($perPage)
-            ->setCurrentPage($currentPage);
-    }
-
-    public function fetch()
+    public function fetchOne()
     {
         $record = $this->execute()->fetch(\PDO::FETCH_ASSOC);
 
@@ -297,10 +317,49 @@ class Query implements \IteratorAggregate
         }
 
         if ($this->entity) {
-            return Builder::hydrate($record, $this->entity);
+            $className = $this->entity;
+            $model = new $className();
+            $model->hydrate($record);
+            $this->afterModelHydrated($model);
+            $this->afterAllFetchedAndHydrated([ $model ]);
+            return $model;
         }
 
-        return $record;
+        return (object) $record;
+    }
+
+    public function fetchAll()
+    {
+        $rows = $this->execute()->fetchAll(\PDO::FETCH_ASSOC);
+
+        if (false === $rows) {
+            return false;
+        }
+
+        $result = new \Ds\Vector();
+        if ($this->entity) {
+            foreach($rows as $row){
+                $className = $this->entity;
+                $model = new $className();
+                $model->hydrate($row);
+                $this->afterModelHydrated($model);
+                $result->push($model);
+            }
+            $this->afterAllFetchedAndHydrated($result);
+            return $result;
+        }
+
+        return (object) $rows;
+    }
+
+    protected function afterModelHydrated($model)
+    {
+
+    }
+
+    protected function afterAllFetchedAndHydrated($result)
+    {
+
     }
 
     /**
@@ -308,7 +367,7 @@ class Query implements \IteratorAggregate
      */
     public function fetchOrFail()
     {
-        $record = $this->fetch();
+        $record = $this->fetchOne();
 
         if (false === $record) {
             throw new \Exception('No query results for model');
@@ -379,17 +438,18 @@ class Query implements \IteratorAggregate
             $parts[] = $this->buildFrom();
         }
 
-        if (!empty($this->where)) {
-            $parts[] = 'WHERE';
-            $parts[] = '(' . implode(') AND (', $this->where) . ')';
-        }
-
         if (!empty($this->joins)) {
             foreach ($this->joins as $type => $joins) {
                 foreach ($joins as [$table, $condition]) {
                     $parts[] = mb_strtoupper($type) . " JOIN $table ON $condition";
                 }
             }
+        }
+
+        //if (!empty($this->where)) {
+        if ($this->where != null) {
+            $parts[] = 'WHERE';
+            $parts[] = (string) $this->where; //'(' . implode(') AND (', $this->where) . ')';
         }
 
         if ($this->order) {
@@ -426,17 +486,20 @@ class Query implements \IteratorAggregate
 
     public function execute()
     {
+        $sql = $this->__toString();
+        echo $sql."\n";
+
         if (!empty($this->params)) {
-            $statement = $this->pdo->prepare($this->__toString());
+            $statement = $this->getPdo()->prepare($sql);
 
             if (!$statement->execute($this->params)) {
-                throw new \Exception("Sql Error by execute query: {$this->__toString()}");
+                throw new \Exception("Sql Error by execute query: {$sql}");
             }
 
             return $statement;
         }
 
-        return $this->pdo->query($this->__toString());
+        return $this->getPdo()->query($sql);
     }
 
     /**
