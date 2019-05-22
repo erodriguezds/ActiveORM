@@ -5,7 +5,7 @@
 <br/>
 <img src="https://img.shields.io/badge/PHP-7.2-blue.svg?style=plastic">
 <br/>
-PHP Query builder, Paginate and Hydratation using PDO
+PHP Query Builder and ActiveRecord-based ORM, heavily inspired in Yii2 ORM and Eloquent (Laravel ORM), but much more compact and lightweight!
 
 ## Features
 
@@ -35,11 +35,26 @@ PHP Query builder, Paginate and Hydratation using PDO
 
 Create a new PDO instance, and pass the instance to Query:
 ```php
-use Goldoni\Builder\Query;
+use ActiveORM\Query;
 ....
 $pdo = new \PDO('mysql:dbname=goldoni;host=localhost;charset=utf8', 'root', 'root');
 $query = (new Query($pdo))
 ```
+
+Or, set the PDO globally, so that every new instance of Query uses it:
+```php
+use ActiveORM\Query;
+....
+$pdo = new \PDO('mysql:dbname=goldoni;host=localhost;charset=utf8', 'root', 'root');
+Query::setPdo($pdo);
+....
+$query = (new Query()) //will get the PDO instance from the global set
+    ->select('*')
+    ->from('users')
+    ->where(...)
+
+```
+
 ### Prerequisites
 
 What things you need to install the software and how to install them
@@ -53,7 +68,7 @@ What things you need to install the software and how to install them
 ### Installing
 
 ```php
-composer require goldoni/php7.2-query-builder
+composer require erodriguezds/active-orm
 ```
 
 ## Examples
