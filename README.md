@@ -9,27 +9,27 @@ PHP Query Builder and ActiveRecord-based ORM, heavily inspired in Yii2 ORM and E
 
 ## Features
 
-* Allows you to perform complex queries with little code
-    - [select](https://github.com/fgoldoni/QueryBuilder#select)
-    - [insert](https://github.com/fgoldoni/QueryBuilder#insert)
-    - [update](https://github.com/fgoldoni/QueryBuilder#update)
-    - [delete](https://github.com/fgoldoni/QueryBuilder#delete)
-    - [where](https://github.com/fgoldoni/QueryBuilder#where)
-    - [params](https://github.com/fgoldoni/QueryBuilder#params)
-    - [count](https://github.com/fgoldoni/QueryBuilder#count)
-    - [orderBy](https://github.com/fgoldoni/QueryBuilder#orderBy)
-    - [groupBy](https://github.com/fgoldoni/QueryBuilder#groupBy)
-    - [joins](https://github.com/fgoldoni/QueryBuilder#joins)
-    - [limit](https://github.com/fgoldoni/QueryBuilder#limit)
-    - [fetchAll](https://github.com/fgoldoni/QueryBuilder#fetchAll)
-    - [fetch](https://github.com/fgoldoni/QueryBuilder#fetch)
-    - [fetchOrFail](https://github.com/fgoldoni/QueryBuilder#fetchOrFail)
-    - [execute](https://github.com/fgoldoni/QueryBuilder#execute)
+* A powerful and intuitive Query builder ("Query": the core class of the entire ORM), with the fluent and beatiful syntax you already know from Eloquent or Yii2 ORM:
 
-* **Pagination** 
-    - [paginate](https://github.com/fgoldoni/QueryBuilder#paginate)
-* **Hydration** Ability to return a collection of objects:
-    - [into(Demo::class)](https://github.com/fgoldoni/QueryBuilder#Hydration)
+#### Select Query
+
+```php
+$results = (new Query($myPdo))
+    ->select('*') // not necesary
+    ->from('users')
+    ->where([
+        'name' => $submitedName, // translates to "name = ? ", where '?' will be replaced by the SQL-escaped value of $submittedPage
+        [ 'age', '>', $submitedAge ], // 3-elements array syntax for 'field', 'operator' and 'value'. The 3rd element will be prepared by PDO
+        "age < $submitedAge", //more confortable, but this way, you won't have a PDO prepared parameter
+        'id' => [2, 3, 6], // translates to "id IN(2, 3, 6)"
+    ], 'OR') // OR's all the previously defined condition. Default is 'AND'
+    ->fetchAll(); // you could also "fetchOne()"
+    
+foreach($result as $row){
+    // ...
+}
+
+```
 
 ## Getting Started
 
